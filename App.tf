@@ -21,6 +21,16 @@ data "azurerm_client_config" "current" {}
 
 data "azurerm_subscription" "primary" {}
 
+terraform {
+  backend "azurerm" {
+    resource_group_name  = "rg-tfstate"
+    storage_account_name = "sttfstate1unique123"
+    container_name        = "tfstate"
+    key                   = "prod.terraform.tfstate"
+    use_azuread_auth      = true
+  }
+}
+
 variable "ssh_public_key" {
   type = string
 }
