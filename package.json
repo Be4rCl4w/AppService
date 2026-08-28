@@ -1,0 +1,12 @@
+{
+  "name": "nigeria-anthem-app",
+  "version": "1.0.0",
+  "description": "Simple Node.js web app displaying the first stanza of the Nigerian national anthem",
+  "main": "server.js",
+      "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  }
+}
