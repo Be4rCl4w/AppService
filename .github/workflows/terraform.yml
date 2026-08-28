@@ -44,4 +44,6 @@ jobs:
 
       - name: Terraform Apply
         if: github.ref == 'refs/heads/main' #&& github.event_name == 'push'
+        env:
+          TF_VAR_ssh_public_key: ${{ vars.SSH_PUBLIC_KEY }}
         run: terraform apply -auto-approve tfplan
