@@ -33,6 +33,8 @@ jobs:
         run: terraform init
 
       - name: Terraform Plan
+        env:
+          TF_VAR_ssh_public_key: ${{ vars.SSH_PUBLIC_KEY }}
         run: terraform plan -out=tfplan -input=false
 
       - name: Upload plan artifact
