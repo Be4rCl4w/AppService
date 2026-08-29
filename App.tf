@@ -261,15 +261,41 @@ resource "azurerm_application_insights" "appi" {
   application_type    = "web"
 }
 
-data "cloudinit_config" "runner_setup" {
-  gzip          = true
-  base64_encode = true
+resource "azurerm_linux_virtual_machine" "linux_vm" {
+  name                  = "demo_linux_vm"
+  location              = azurerm_resource_group.rg.location
+  resource_group_name   = azurerm_resource_group.rg.name
+  network_interface_ids = [azurerm_network_interface.linux_nic.id]
+  size                  = "Standard_B1s" #Standard_B1s  Standard_D2ds_v4
+  computer_name         = "linuxvm"
 
-  part {
-    content_type = "text/x-shellscript"
-    content      = <<-EOF
+  admin_username = "adminuser1"
+  
+  admin_ssh_key {
+    public_key     = var.ssh_public_key
+    username       = "adminuser1"
+  }
+
+  source_image_reference {
+    publisher = "Canonical"
+    offer     = "0001-com-ubuntu-server-jammy"
+    sku       = "22_04-lts"
+    version   = "latest"
+  }
+
+  identity {
+    type = "SystemAssigned"
+  }
+
+  os_disk {
+    name                 = "demo_linux_os_disk"
+    caching              = "ReadWrite"
+    storage_account_type = "Standard_LRS"
+  } 
+
+user_data = base64encode(<<-EOF
       #!/bin/bash
-      set -euo pipefail
+       set -euo pipefail
       
       # Configuration Variables (injected by Terraform templatefile())
       KV_NAME="kv-runner-secrets"
@@ -355,42 +381,7 @@ data "cloudinit_config" "runner_setup" {
       ./svc.sh install "$RUNNER_USER"
       ./svc.sh start
     EOF
-  }
-}
-
-resource "azurerm_linux_virtual_machine" "linux_vm" {
-  name                  = "demo_linux_vm"
-  location              = azurerm_resource_group.rg.location
-  resource_group_name   = azurerm_resource_group.rg.name
-  network_interface_ids = [azurerm_network_interface.linux_nic.id]
-  size                  = "Standard_B1s" #Standard_B1s  Standard_D2ds_v4
-  computer_name         = "linuxvm"
-
-  admin_username = "adminuser1"
-  
-  admin_ssh_key {
-    public_key     = var.ssh_public_key
-    username       = "adminuser1"
-  }
-
-  source_image_reference {
-    publisher = "Canonical"
-    offer     = "0001-com-ubuntu-server-jammy"
-    sku       = "22_04-lts"
-    version   = "latest"
-  }
-
-  identity {
-    type = "SystemAssigned"
-  }
-
-  os_disk {
-    name                 = "demo_linux_os_disk"
-    caching              = "ReadWrite"
-    storage_account_type = "Standard_LRS"
-
-  } 
-  custom_data = data.cloudinit_config.runner_setup.rendered
+    )
 }
 
 resource "azurerm_role_assignment" "deployer_kv_officer" {
