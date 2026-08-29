@@ -41,11 +41,13 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: tfplan
+          path: /tfplan
 
       - name: Download plan artifact
         uses: actions/download-artifact@v4
         with:
           name: tfplan
+          path: /tfplan
 
       - name: Terraform Apply
         if: github.ref == 'refs/heads/main' #&& github.event_name == 'push'
