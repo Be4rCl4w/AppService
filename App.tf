@@ -34,7 +34,7 @@ variable "ssh_public_key" {
 
 
 resource "azurerm_resource_group" "rg" {
-  name           ="Demo-RGRP"
+  name           ="Demo-RGRP123"
   location       = "North Europe"
 }
 
