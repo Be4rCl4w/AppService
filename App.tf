@@ -113,8 +113,9 @@ resource "azurerm_private_dns_zone" "private_dns_zone" {
 
 resource "azurerm_private_dns_zone_virtual_network_link" "app_service" {
   name                  = "link1"
-  private_dns_zone_id   = azurerm_private_dns_zone.private_dns_zone.id
+  resource_group_name = azurerm_resource_group.rg.name
   virtual_network_id    = azurerm_virtual_network.vnet.id
+  private_dns_zone_name = azurerm_private_dns_zone.private_dns_zone.name
 }
   
 resource "azurerm_private_endpoint" "app" {
