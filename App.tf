@@ -322,7 +322,7 @@ user_data = base64encode(<<-EOF
       az login --identity
       
       # 3. Fetch GitHub App private key from Key Vault
-      PEM_KEY=$(az keyvault secret show --vault-name "$KV_NAME" --name "$SECRET_NAME" --query value -o tsv)
+      PEM_KEY=$(az keyvault secret show --vault-name "$KV_NAME" --name "$$SECRET_NAME" --query value -o tsv)
       if [ -z "$PEM_KEY" ]; then
         echo "ERROR: empty private key from Key Vault — check managed identity permissions" >&2
         exit 1
@@ -350,7 +350,7 @@ user_data = base64encode(<<-EOF
       RUNNER_TOKEN=$(curl -sf -X POST \
         -H "Authorization: Bearer $INSTALLATION_TOKEN" \
         -H "Accept: application/vnd.github+json" \
-        https://api.github.com/orgs/"$GITHUB_ORG"/actions/runners/registration-token | jq -r .token)
+        https://api.github.com/orgs/"$$GITHUB_ORG"/actions/runners/registration-token | jq -r .token)
       
       if [ -z "$RUNNER_TOKEN" ] || [ "$RUNNER_TOKEN" = "null" ]; then
         echo "ERROR: failed to obtain runner registration token — check GitHub App repo permissions" >&2
@@ -358,27 +358,26 @@ user_data = base64encode(<<-EOF
       fi
       
       # 7. Create a dedicated, unprivileged user to own and run the runner
-      id -u "$RUNNER_USER" &>/dev/null || useradd -m -s /bin/bash "$RUNNER_USER"
+      id -u "$$RUNNER_USER" &>/dev/null || useradd -m -s /bin/bash "$$RUNNER_USER"
       
       mkdir -p /actions-runner
-      chown "$RUNNER_USER":"$RUNNER_USER" /actions-runner
+      chown "$$RUNNER_USER":"$$RUNNER_USER" /actions-runner
       cd /actions-runner
       
-      curl -o actions-runner-linux-x64.tar.gz -L \
-        "https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/actions-runner-linux-x64-${RUNNER_VERSION}.tar.gz"
+      curl -o actions-runner-linux-x64.tar.gz -L https://github.com/actions/runner/releases/download/v$${RUNNER_VERSION}/actions-runner-linux-x64-$${RUNNER_VERSION}.tar.gz
       tar xzf actions-runner-linux-x64.tar.gz
-      chown -R "$RUNNER_USER":"$RUNNER_USER" /actions-runner
+      chown -R "$$RUNNER_USER":"$$RUNNER_USER" /actions-runner
       
       # 8. Configure as the unprivileged user, against the repo-level URL
-      sudo -u "$RUNNER_USER" ./config.sh \
-        --url "https://github.com/$GITHUB_ORG/$GITHUB_REPO" \
+      sudo -u "$$RUNNER_USER" ./config.sh \
+        --url https://github.com/$$GITHUB_ORG/$$GITHUB_REPO \
         --token "$RUNNER_TOKEN" \
         --name "$(hostname)" \
         --unattended \
         --replace
       
       # 9. Install and start the service (this step does need root)
-      ./svc.sh install "$RUNNER_USER"
+      ./svc.sh install "$$RUNNER_USER"
       ./svc.sh start
     EOF
     )
