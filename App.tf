@@ -15,11 +15,8 @@ terraform {
 provider "azuread" {}
 provider "azurerm" {
   features {}
+  use_oidc        = true
 }
-
-data "azurerm_client_config" "current" {}
-
-data "azurerm_subscription" "primary" {}
 
 terraform {
   backend "azurerm" {
@@ -37,7 +34,7 @@ variable "ssh_public_key" {
 
 
 resource "azurerm_resource_group" "rg" {
-  name           ="Demo-RG"
+  name           ="Demo-RGRP"
   location       = "North Europe"
 }
 
