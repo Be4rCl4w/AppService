@@ -32,6 +32,16 @@ variable "ssh_public_key" {
   type = string
 }
 
+data "azurerm_key_vault" "example" {
+  name                 = "kv-runner-secrets"
+  resource_group_name  = "tfstate"
+}
+
+data "azurerm_key_vault_secret" "example" {
+  name          = "github-app-private-key"
+  key_vault_id  = data.azurerm_key_vault.example.id
+}
+
 
 resource "azurerm_resource_group" "rg" {
   name           ="Demo-RGRP123"
@@ -179,6 +189,7 @@ resource "azurerm_service_plan" "example" {
   location            = azurerm_resource_group.rg.location
   os_type             = "Linux"
   sku_name            = "P0v3"
+  address_space.commm       = ["10.20.0.0/16"]
 }
 
 resource "azurerm_linux_web_app" "example" {
@@ -259,27 +270,91 @@ data "cloudinit_config" "runner_setup" {
     content_type = "text/x-shellscript"
     content      = <<-EOF
       #!/bin/bash
-      # 1. Create runner directory
-      mkdir -p /actions-runner && cd /actions-runner
-
-      # 2. Download latest runner package
-      curl -o actions-runner-linux-x64-2.336.0.tar.gz -L https://github.com/actions/runner/releases/download/v2.336.0/actions-runner-linux-x64-2.336.0.tar.gz
-
-      #Extract installer
-      tar xzf ./actions-runner-linux-x64-2.336.0.tar.gz
-
-
-      # 3. Configure and register runner non-interactively
-     ./config.sh --url https://github.com/Be4rCl4w/AppService \
-                  --token A5CWCEWXTAN6XAUKG4TTSY3KSDKL2 \
-                  --unattended \
-                  --replace
-
-      curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+      set -euo pipefail
       
-      # 4. Install & start background service
-      sudo ./svc.sh install
-      sudo ./svc.sh start
+      # Configuration Variables (injected by Terraform templatefile())
+      KV_NAME="kv-runner-secrets"
+      SECRET_NAME="github-app-private-key"
+      APP_ID="4762328"
+      INSTALLATION_ID="157533345"
+      GITHUB_ORG="Be4rCl4w"     # bare org slug, e.g. "my-org"
+      GITHUB_REPO="AppService"  # bare repo name, e.g. "my-repo"
+      
+      RUNNER_VERSION="2.317.0"
+      RUNNER_USER="ghrunner"
+      
+      # 1. Prerequisites, including Microsoft's apt repo (required for azure-cli)
+      apt-get update
+      apt-get install -y jq openssl curl ca-certificates lsb-release gnupg
+      
+      curl -sL https://packages.microsoft.com/keys/microsoft.asc | gpg --dearmor > /etc/apt/trusted.gpg.d/microsoft.gpg
+      AZ_REPO=$(lsb_release -cs)
+      echo "deb [arch=amd64] https://packages.microsoft.com/repos/azure-cli/ $AZ_REPO main" > /etc/apt/sources.list.d/azure-cli.list
+      apt-get update
+      apt-get install -y azure-cli
+      
+      # 2. Login using the VM's system-assigned Managed Identity (no client-id needed)
+      az login --identity
+      
+      # 3. Fetch GitHub App private key from Key Vault
+      PEM_KEY=$(az keyvault secret show --vault-name "$KV_NAME" --name "$SECRET_NAME" --query value -o tsv)
+      if [ -z "$PEM_KEY" ]; then
+        echo "ERROR: empty private key from Key Vault — check managed identity permissions" >&2
+        exit 1
+      fi
+      
+      # 4. Generate JWT for GitHub App authentication
+      HEADER=$(echo -n '{"alg":"RS256","typ":"JWT"}' | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
+      NOW=$(date +%s)
+      PAYLOAD=$(echo -n "{\"iat\":$((NOW - 60)),\"exp\":$((NOW + 600)),\"iss\":\"$APP_ID\"}" | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
+      SIGNATURE=$(echo -n "$HEADER.$PAYLOAD" | openssl dgst -sha256 -sign <(echo "$PEM_KEY") | base64 | tr -d '=' | tr '/+' '_-' | tr -d '\n')
+      JWT="$HEADER.$PAYLOAD.$SIGNATURE"
+      
+      # 5. Exchange JWT for an installation access token
+      INSTALLATION_TOKEN=$(curl -sf -X POST \
+        -H "Authorization: Bearer $JWT" \
+        -H "Accept: application/vnd.github+json" \
+        https://api.github.com/app/installations/"$INSTALLATION_ID"/access_tokens | jq -r .token)
+      
+      if [ -z "$INSTALLATION_TOKEN" ] || [ "$INSTALLATION_TOKEN" = "null" ]; then
+        echo "ERROR: failed to obtain installation token" >&2
+        exit 1
+      fi
+      
+      # 6. Get a fresh REPO-level runner registration token (note: /repos, not /orgs)
+      RUNNER_TOKEN=$(curl -sf -X POST \
+        -H "Authorization: Bearer $INSTALLATION_TOKEN" \
+        -H "Accept: application/vnd.github+json" \
+        https://api.github.com/orgs/"$GITHUB_ORG"/actions/runners/registration-token | jq -r .token)
+      
+      if [ -z "$RUNNER_TOKEN" ] || [ "$RUNNER_TOKEN" = "null" ]; then
+        echo "ERROR: failed to obtain runner registration token — check GitHub App repo permissions" >&2
+        exit 1
+      fi
+      
+      # 7. Create a dedicated, unprivileged user to own and run the runner
+      id -u "$RUNNER_USER" &>/dev/null || useradd -m -s /bin/bash "$RUNNER_USER"
+      
+      mkdir -p /actions-runner
+      chown "$RUNNER_USER":"$RUNNER_USER" /actions-runner
+      cd /actions-runner
+      
+      curl -o actions-runner-linux-x64.tar.gz -L \
+        "https://github.com/actions/runner/releases/download/v${RUNNER_VERSION}/actions-runner-linux-x64-${RUNNER_VERSION}.tar.gz"
+      tar xzf actions-runner-linux-x64.tar.gz
+      chown -R "$RUNNER_USER":"$RUNNER_USER" /actions-runner
+      
+      # 8. Configure as the unprivileged user, against the repo-level URL
+      sudo -u "$RUNNER_USER" ./config.sh \
+        --url "https://github.com/$GITHUB_ORG/$GITHUB_REPO" \
+        --token "$RUNNER_TOKEN" \
+        --name "$(hostname)" \
+        --unattended \
+        --replace
+      
+      # 9. Install and start the service (this step does need root)
+      ./svc.sh install "$RUNNER_USER"
+      ./svc.sh start
     EOF
   }
 }
@@ -306,6 +381,10 @@ resource "azurerm_linux_virtual_machine" "linux_vm" {
     version   = "latest"
   }
 
+  identity {
+    type = "SystemAssigned"
+  }
+
   os_disk {
     name                 = "demo_linux_os_disk"
     caching              = "ReadWrite"
@@ -313,5 +392,11 @@ resource "azurerm_linux_virtual_machine" "linux_vm" {
 
   } 
   custom_data = data.cloudinit_config.runner_setup.rendered
+}
+
+resource "azurerm_role_assignment" "deployer_kv_officer" {
+  scope                = data.azurerm_key_vault.kv-runner-secrets.id
+  role_definition_name = "Key Vault Secrets User"
+  principal_id         = azurerm_linux_virtual_machine.linux_vm.identity[0].principal_id
 }
 
