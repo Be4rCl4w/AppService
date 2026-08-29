@@ -279,7 +279,7 @@ data "cloudinit_config" "runner_setup" {
       GITHUB_ORG="Be4rCl4w"     # bare org slug, e.g. "my-org"
       GITHUB_REPO="AppService"  # bare repo name, e.g. "my-repo"
       
-      RUNNER_VERSION="2.317.0"
+      RUNNER_VERSION="2.336.0"
       RUNNER_USER="ghrunner"
       
       # 1. Prerequisites, including Microsoft's apt repo (required for azure-cli)
