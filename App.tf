@@ -33,7 +33,7 @@ variable "ssh_public_key" {
 }
 
 data "azurerm_key_vault" "example" {
-  name                 = "kv-runner-secrets"
+  name                 = "kv1-runne1r-secret1s"
   resource_group_name  = "tfstate"
 }
 
@@ -189,7 +189,6 @@ resource "azurerm_service_plan" "example" {
   location            = azurerm_resource_group.rg.location
   os_type             = "Linux"
   sku_name            = "P0v3"
-  address_space.commm       = ["10.20.0.0/16"]
 }
 
 resource "azurerm_linux_web_app" "example" {
