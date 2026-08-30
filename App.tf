@@ -37,11 +37,6 @@ data "azurerm_key_vault" "example" {
   resource_group_name  = "rg-tfstate"
 }
 
-data "azurerm_key_vault_secret" "example" {
-  name          = "github-app-private-key"
-  key_vault_id  = data.azurerm_key_vault.example.id
-}
-
 
 resource "azurerm_resource_group" "rg" {
   name           ="Demo-RGRP123"
