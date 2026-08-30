@@ -34,7 +34,7 @@ variable "ssh_public_key" {
 
 data "azurerm_key_vault" "example" {
   name                 = "kv1-runne1r-secret1s"
-  resource_group_name  = "tfstate"
+  resource_group_name  = "rg-tfstate"
 }
 
 data "azurerm_key_vault_secret" "example" {
