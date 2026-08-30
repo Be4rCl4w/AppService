@@ -384,7 +384,7 @@ user_data = base64encode(<<-EOF
 }
 
 resource "azurerm_role_assignment" "deployer_kv_officer" {
-  scope                = data.azurerm_key_vault.kv-runner-secrets.id
+  scope                = data.azurerm_key_vault.example.id
   role_definition_name = "Key Vault Secrets User"
   principal_id         = azurerm_linux_virtual_machine.linux_vm.identity[0].principal_id
 }
