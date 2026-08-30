@@ -47,4 +47,4 @@ jobs:
         if: github.ref == 'refs/heads/main' #&& github.event_name == 'push'
         env:
           TF_VAR_ssh_public_key: ${{ vars.SSH_PUBLIC_KEY }}
-        run: terraform apply -input=false -auto-approve tfplan
+        run: terraform delete -input=false -auto-approve tfplan
