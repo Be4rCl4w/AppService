@@ -32,16 +32,16 @@ jobs:
       - name: Terraform Init
         run: terraform init
 
-      - name: Terraform Plan
-        env:
-          TF_VAR_ssh_public_key: ${{ vars.SSH_PUBLIC_KEY }}
-        run: terraform plan -out=tfplan -input=false
+      #- name: Terraform Plan
+        #env:
+          #TF_VAR_ssh_public_key: ${{ vars.SSH_PUBLIC_KEY }}
+        #run: terraform plan -out=tfplan -input=false
 
-      - name: Upload plan artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: tfplan
-          path: tfplan
+      #- name: Upload plan artifact
+        #uses: actions/upload-artifact@v4
+        #with:
+          #name: tfplan
+          #path: tfplan
 
       - name: Terraform Apply
         if: github.ref == 'refs/heads/main' #&& github.event_name == 'push'
