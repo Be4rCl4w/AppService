@@ -8,7 +8,8 @@ name: tfsec
 on:
   push:
     branches: [ "main" ]
- 
+  workflow_dispatch:
+
 jobs:
   tfsec:
     name: Run tfsec sarif report
