@@ -48,8 +48,14 @@ jobs:
           framework: terraform
           quiet: true
           output_format: sarif
-          output_file_path: reports/results.sarif
+          output_file_path: results.sarif
           soft_fail: true # set to false once findings are triaged, to block on issues
+
+      - name: Upload Checkov scan results to GitHub Security tab
+        uses: actions/upload-artifact@v4
+        with:
+          name: Checkov-report
+          path: results.sarif
 
       - name: Run Trivy vulnerability scanner (IaC)
         uses: aquasecurity/trivy-action@v0.36.0
@@ -62,24 +68,24 @@ jobs:
           output: 'trivy-results.sarif'
 
       - name: Upload Trivy scan results to GitHub Security tab
-        uses: github/codeql-action/upload-sarif@v3
-        if: always()
+        uses: actions/upload-artifact@v4
         with:
-          sarif_file: 'trivy-results.sarif'
+          name: Trivy-report
+          path: trivy-results.sarif
 
-      #- name: Terraform Plan
-        #env:
-          #TF_VAR_ssh_public_key: ${{ vars.SSH_PUBLIC_KEY }}
-        #run: terraform plan -input=false #-out=tfplan
+      - name: Terraform Plan
+        env:
+          TF_VAR_ssh_public_key: ${{ vars.SSH_PUBLIC_KEY }}
+        run: terraform plan -input=false #-out=tfplan
 
-      #- name: Upload plan artifact
-        #uses: actions/upload-artifact@v4
-        #with:
-          #name: tfplan
-          #path: tfplan
+      - name: Upload plan artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: tfplan
+          path: tfplan
 
       - name: Terraform Apply
         if: github.ref == 'refs/heads/main' #&& github.event_name == 'push'
         env:
           TF_VAR_ssh_public_key: ${{ vars.SSH_PUBLIC_KEY }}
-        run: terraform apply -input=false -auto-approve #tfplan
+        run: terraform apply -input=false -auto-approve tfplan
