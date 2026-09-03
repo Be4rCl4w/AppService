@@ -10,6 +10,7 @@ on:
 permissions:
   id-token: write
   contents: read
+  security-events: write
 
 env:
   ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
@@ -24,6 +25,12 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Run Gitleaks (secret scan)
+        uses: gitleaks/gitleaks-action@v4
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_COMMENTS: false
+
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
@@ -31,6 +38,25 @@ jobs:
 
       - name: Terraform Init
         run: terraform init
+
+      - name: Run Checkov
+        id: checkov
+        uses: bridgecrewio/checkov-action@v12
+        with:
+          directory: .
+          framework: terraform
+          quiet: true
+          output_format: sarif
+          output_file_path: reports/results.sarif
+          soft_fail: true # set to false once findings are triaged, to block on issues
+
+      - name: Run Trivy (IaC scan)
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: config
+          scan-ref: .
+          exit-code: 0 # set to 1 once findings are triaged, to block on issues
+          severity: CRITICAL,HIGH,MEDIUM
 
       #- name: Terraform Plan
         #env:
@@ -47,4 +73,4 @@ jobs:
         if: github.ref == 'refs/heads/main' #&& github.event_name == 'push'
         env:
           TF_VAR_ssh_public_key: ${{ vars.SSH_PUBLIC_KEY }}
-        run: terraform destroy -input=false -auto-approve #tfplan
+        run: terraform apply -input=false -auto-approve #tfplan
